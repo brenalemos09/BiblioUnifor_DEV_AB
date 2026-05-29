@@ -109,14 +109,25 @@ class TelaRF32LivrosCRUD : AppCompatActivity() {
                 if (snapshot != null) {
                     listaCompleta.clear()
                     for (doc in snapshot) {
+                        // disponíveis = cópias sem aluguel ativo (campo decrementado pelo repo)
+                        val disponiveis = doc.getLong("quantidade")
+                            ?: doc.getLong("estoque")
+                            ?: doc.getLong("exemplares")
+                            ?: 0L
+                        // total = total físico da faculdade (nunca decrementado por aluguéis)
+                        val totalFisico = doc.getLong("totalExemplares")
+                            ?: doc.getLong("stockQuantity")
+                            ?: disponiveis   // fallback: documentos antigos sem o campo
+
                         listaCompleta.add(
                             ItemLivroAdm(
-                                docId      = doc.id,
-                                titulo     = doc.getString("title")     ?: doc.getString("titulo")     ?: "Título Indisponível",
-                                autor      = doc.getString("author")    ?: doc.getString("autor")      ?: "Autor Desconhecido",
-                                isbn       = doc.getString("isbn")      ?: doc.getString("codigo_isbn") ?: "",
-                                quantidade = doc.getLong("quantidade")  ?: doc.getLong("exemplares")   ?: 0L,
-                                coverUrl   = doc.getString("coverUrl")  ?: doc.getString("imagemUrl")  ?: ""
+                                docId                = doc.id,
+                                titulo               = doc.getString("title")    ?: doc.getString("titulo")      ?: "Título Indisponível",
+                                autor                = doc.getString("author")   ?: doc.getString("autor")       ?: "Autor Desconhecido",
+                                isbn                 = doc.getString("isbn")     ?: doc.getString("codigo_isbn") ?: "",
+                                quantidadeDisponivel = disponiveis,
+                                totalExemplares      = totalFisico,
+                                coverUrl             = doc.getString("coverUrl") ?: doc.getString("imagemUrl")   ?: ""
                             )
                         )
                     }

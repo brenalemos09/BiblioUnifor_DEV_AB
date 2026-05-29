@@ -7,33 +7,24 @@ import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.view.Window
-import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import coil.load
 import com.example.bibliounifornew.R
 import com.example.bibliounifornew.data.AuthRepository
-import com.example.bibliounifornew.data.SolicitacaoRepository
-import com.example.bibliounifornew.data.UsuarioRepository
 import com.example.bibliounifornew.features.usuario.livro.TelaRF11TelaDePesquisa
-import com.example.bibliounifornew.features.usuario.solicitacao.TelaRF18StatusAluguel
 import com.example.bibliounifornew.features.usuario.solicitacao.TelaRF19SolicitacoesTermosCondicoes
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.launch
 
 class TelaRF14LeituraActivity : AppCompatActivity() {
 
-    private val authRepository        = AuthRepository()
-    private val solicitacaoRepository = SolicitacaoRepository()
-    private val usuarioRepository     = UsuarioRepository()
-    private val db                    = FirebaseFirestore.getInstance()
-    private var livroIdAtual   : String = ""
+    private val authRepository = AuthRepository()
+    private val db             = FirebaseFirestore.getInstance()
 
-    /** URLs de mídia — populadas por carregarCabecalho(), usadas pelos botões */
+    private var livroIdAtual   : String = ""
     private var linkPdfAtual   : String = ""
     private var linkAudioAtual : String = ""
     private var tituloAtual    : String = ""
@@ -47,55 +38,67 @@ class TelaRF14LeituraActivity : AppCompatActivity() {
 
         livroIdAtual = intent.getStringExtra("LIVRO_ID") ?: ""
 
-        // Placeholder enquanto os dados carregam
+        // Placeholders de carregamento
         findViewById<TextView>(R.id.textTituloLivroAcoes)?.text    = getString(R.string.carregando_dados)
         findViewById<TextView>(R.id.textAutorLivroAcoes)?.text     = ""
         findViewById<TextView>(R.id.textCategoriaLivroAcoes)?.text = ""
+
+        // PDF e Audiobook começam desabilitados — só habilitados após validação da URL
+        desabilitarBotaoMidia(R.id.buttonAbrirPdfLivro,   R.id.textStatusPdf)
+        desabilitarBotaoMidia(R.id.buttonAbrirAudioLivro, R.id.textStatusAudio)
 
         if (livroIdAtual.isNotEmpty()) {
             carregarCabecalho(livroIdAtual)
             verificarStatusAluguelRapido()
         }
 
-        // ─── BOTÃO ALUGAR ─────────────────────────────────────────────────────
+        // ─── ALUGAR → Termos e Condições (RF19) ──────────────────────────────
+        // Mesmo fluxo dos outros botões: todos passam pela tela de Termos primeiro.
         findViewById<Button>(R.id.buttonAlugarLivro)?.setOnClickListener {
-            showPopupConfirmacaoAluguel()
+            irParaTermos("Aluguel")
         }
 
-        // ─── BOTÃO RESERVAR ──────────────────────────────────────────────────
+        // ─── RESERVAR → Termos e Condições ───────────────────────────────────
         findViewById<Button>(R.id.buttonReservar)?.setOnClickListener {
-            irParaSolicitacao("Reserva")
+            irParaTermos("Reserva")
         }
 
-        // ─── BOTÕES DE SOLICITAÇÃO DE MÍDIA ──────────────────────────────────
+        // ─── SOLICITAÇÕES DE MÍDIA → Termos e Condições ──────────────────────
         findViewById<Button>(R.id.buttonSolicitarPdf)?.setOnClickListener {
-            irParaSolicitacao("PDF")
+            irParaTermos("PDF")
         }
         findViewById<Button>(R.id.buttonSolicitarBraille)?.setOnClickListener {
-            irParaSolicitacao("Braille")
+            irParaTermos("Braille")
         }
         findViewById<Button>(R.id.buttonSolicitarAudio)?.setOnClickListener {
-            irParaSolicitacao("Audiobook")
+            irParaTermos("Audiobook")
         }
 
-        // ─── BOTÃO PROCURAR ───────────────────────────────────────────────────
-        findViewById<Button>(R.id.buttonProcurarLivro)?.setOnClickListener {
-            startActivity(Intent(this, TelaRF11TelaDePesquisa::class.java))
-        }
-
-        // ─── BOTÃO ABRIR PDF ──────────────────────────────────────────────────
+        // ─── ABRIR PDF ────────────────────────────────────────────────────────
+        // Habilitado/desabilitado dinamicamente por atualizarIndicadoresMidia()
         findViewById<Button>(R.id.buttonAbrirPdfLivro)?.setOnClickListener {
-            abrirMidia(linkPdfAtual, "pdf")
+            abrirUrlExterna(linkPdfAtual)
         }
 
-        // ─── BOTÃO ABRIR AUDIOBOOK ────────────────────────────────────────────
+        // ─── ABRIR AUDIOBOOK ──────────────────────────────────────────────────
         findViewById<Button>(R.id.buttonAbrirAudioLivro)?.setOnClickListener {
-            abrirMidia(linkAudioAtual, "audio")
+            abrirUrlExterna(linkAudioAtual)
         }
 
-        // ─── BOTÃO SETOR LOCALIZADO ──────────────────────────────────────────
+        // ─── SETOR LOCALIZADO ─────────────────────────────────────────────────
         findViewById<Button>(R.id.buttonSetorLivro)?.setOnClickListener {
             showPopupSetor()
+        }
+
+        // ─── PROCURAR ─────────────────────────────────────────────────────────
+        // Usa CLEAR_TOP para reaproveitar instância existente na pilha;
+        // finish() garante que esta Activity não fique acumulada acima da busca.
+        findViewById<Button>(R.id.buttonProcurarLivro)?.setOnClickListener {
+            startActivity(
+                Intent(this, TelaRF11TelaDePesquisa::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            )
+            finish()
         }
     }
 
@@ -106,21 +109,17 @@ class TelaRF14LeituraActivity : AppCompatActivity() {
             .addOnSuccessListener { doc ->
                 if (!doc.exists() || isFinishing || isDestroyed) return@addOnSuccessListener
 
-                val titulo    = doc.getString("title")    ?: doc.getString("titulo")    ?: "Título Indisponível"
-                val autor     = doc.getString("author")   ?: doc.getString("autor")     ?: "Autor Desconhecido"
-                val categoria = doc.getString("category") ?: doc.getString("categoria") ?: "Geral"
-                val coverUrl  = doc.getString("coverUrl") ?: ""
-
-                // Armazena para uso posterior nos listeners dos botões
-                tituloAtual    = titulo
-                autorAtual     = autor
+                tituloAtual    = doc.getString("title")         ?: doc.getString("titulo")    ?: "Título Indisponível"
+                autorAtual     = doc.getString("author")        ?: doc.getString("autor")     ?: "Autor Desconhecido"
+                val categoria  = doc.getString("category")      ?: doc.getString("categoria") ?: "Geral"
+                val coverUrl   = doc.getString("coverUrl")      ?: ""
                 coverUrlAtual  = coverUrl
-                setorAtual     = doc.getString("librarySector") ?: doc.getString("setor") ?: getString(R.string.msg_setor_nao_informado)
-                linkPdfAtual   = doc.getString("linkPdf")      ?: ""
+                setorAtual     = doc.getString("librarySector") ?: doc.getString("setor")     ?: getString(R.string.msg_setor_nao_informado)
+                linkPdfAtual   = doc.getString("linkPdf")       ?: ""
                 linkAudioAtual = doc.getString("linkAudiobook") ?: ""
 
-                findViewById<TextView>(R.id.textTituloLivroAcoes)?.text    = titulo
-                findViewById<TextView>(R.id.textAutorLivroAcoes)?.text     = autor
+                findViewById<TextView>(R.id.textTituloLivroAcoes)?.text    = tituloAtual
+                findViewById<TextView>(R.id.textAutorLivroAcoes)?.text     = autorAtual
                 findViewById<TextView>(R.id.textCategoriaLivroAcoes)?.text = categoria
 
                 val imgCapa = findViewById<ImageView>(R.id.imageLivroAcoes)
@@ -129,24 +128,88 @@ class TelaRF14LeituraActivity : AppCompatActivity() {
                         placeholder(R.drawable.osda)
                         error(R.drawable.osda)
                         crossfade(true)
-                        size(500, 750) // Reduz pressão de memória para capas grandes
+                        size(500, 750)
                     }
                 } else {
                     imgCapa?.setImageResource(R.drawable.osda)
                 }
+
+                // Após preencher as URLs, atualiza os indicadores de disponibilidade
+                atualizarIndicadoresMidia()
             }
             .addOnFailureListener {
                 if (!isFinishing && !isDestroyed) {
-                    Toast.makeText(this, "Erro ao carregar dados do livro.", Toast.LENGTH_SHORT).show()
-                    findViewById<TextView>(R.id.textTituloLivroAcoes)?.text = "Sem título"
+                    Toast.makeText(this, getString(R.string.erro_carregar_dados_livro), Toast.LENGTH_SHORT).show()
+                    findViewById<TextView>(R.id.textTituloLivroAcoes)?.text = getString(R.string.sem_titulo)
                 }
             }
     }
 
-    /**
-     * Verifica se o livro já está alugado ANTES do usuário clicar no botão,
-     * melhorando a fluidez e evitando popups desnecessários.
-     */
+    // ─── INDICADORES DE DISPONIBILIDADE DE MÍDIA ──────────────────────────────
+
+    private fun desabilitarBotaoMidia(btnId: Int, tvId: Int) {
+        findViewById<Button>(btnId)?.apply {
+            isEnabled = false
+            alpha     = 0.5f
+        }
+        // TextView fica sem texto enquanto aguarda carregamento
+        findViewById<TextView>(tvId)?.text = ""
+    }
+
+    private fun atualizarIndicadoresMidia() {
+        val corDisponivel   = Color.parseColor("#2E7D32")
+        val corIndisponivel = Color.parseColor("#C62828")
+
+        // PDF
+        val btnPdf       = findViewById<Button>(R.id.buttonAbrirPdfLivro)
+        val txtStatusPdf = findViewById<TextView>(R.id.textStatusPdf)
+        if (linkPdfAtual.isNotBlank()) {
+            txtStatusPdf?.text = getString(R.string.msg_midia_disponivel)
+            txtStatusPdf?.setTextColor(corDisponivel)
+            btnPdf?.isEnabled = true
+            btnPdf?.alpha     = 1.0f
+        } else {
+            txtStatusPdf?.text = getString(R.string.msg_midia_indisponivel_servidor)
+            txtStatusPdf?.setTextColor(corIndisponivel)
+            btnPdf?.isEnabled = false
+            btnPdf?.alpha     = 0.5f
+        }
+
+        // Audiobook
+        val btnAudio       = findViewById<Button>(R.id.buttonAbrirAudioLivro)
+        val txtStatusAudio = findViewById<TextView>(R.id.textStatusAudio)
+        if (linkAudioAtual.isNotBlank()) {
+            txtStatusAudio?.text = getString(R.string.msg_midia_disponivel)
+            txtStatusAudio?.setTextColor(corDisponivel)
+            btnAudio?.isEnabled = true
+            btnAudio?.alpha     = 1.0f
+        } else {
+            txtStatusAudio?.text = getString(R.string.msg_midia_indisponivel_servidor)
+            txtStatusAudio?.setTextColor(corIndisponivel)
+            btnAudio?.isEnabled = false
+            btnAudio?.alpha     = 0.5f
+        }
+    }
+
+    // ─── NAVEGAÇÃO PARA TERMOS (RF19) ─────────────────────────────────────────
+
+    private fun irParaTermos(tipo: String) {
+        if (tituloAtual.isEmpty()) {
+            Toast.makeText(this, getString(R.string.msg_aguarde_carregamento), Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(
+            Intent(this, TelaRF19SolicitacoesTermosCondicoes::class.java).apply {
+                putExtra("TIPO_MIDIA", tipo)
+                putExtra("LIVRO_ID",   livroIdAtual)
+                putExtra("TITULO",     tituloAtual)
+                putExtra("AUTOR",      autorAtual)
+            }
+        )
+    }
+
+    // ─── VERIFICAÇÃO DE ALUGUEL EXISTENTE ────────────────────────────────────
+
     private fun verificarStatusAluguelRapido() {
         val uid = authRepository.getUsuarioAtual()?.uid ?: return
         db.collection("solicitacoes_emprestimo")
@@ -155,173 +218,36 @@ class TelaRF14LeituraActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener { snapshot ->
                 val jaAlugado = snapshot.documents.any { doc ->
-                    val status = doc.getString("status") ?: ""
-                    status in listOf("pendente", "ativo", "atrasado")
+                    doc.getString("status") in listOf("pendente", "ativo", "atrasado")
                 }
                 if (jaAlugado) {
                     val btnAlugar = findViewById<Button>(R.id.buttonAlugarLivro)
-                    btnAlugar?.text = getString(R.string.label_alugado)
+                    btnAlugar?.text      = getString(R.string.label_alugado)
                     btnAlugar?.isEnabled = false
-                    btnAlugar?.alpha = 0.6f
+                    btnAlugar?.alpha     = 0.6f
                 }
             }
     }
 
-    // ─── NAVEGAÇÃO PARA SOLICITAÇÕES (RF19) ──────────────────────────────────
+    // ─── ABRIR URL EXTERNA ────────────────────────────────────────────────────
 
-    private fun irParaSolicitacao(tipo: String) {
-        if (tituloAtual.isEmpty()) {
-            Toast.makeText(this, getString(R.string.msg_aguarde_carregamento), Toast.LENGTH_SHORT).show()
-            return
-        }
-        navegarParaTermos(tipo)
-    }
-
-    private fun navegarParaTermos(tipo: String) {
-        val intent = Intent(this, TelaRF19SolicitacoesTermosCondicoes::class.java).apply {
-            putExtra("TIPO_MIDIA", tipo)
-            putExtra("LIVRO_ID",   livroIdAtual)
-            putExtra("TITULO",     tituloAtual)
-            putExtra("AUTOR",      autorAtual)
-        }
-        startActivity(intent)
-    }
-
-    // ─── POPUPS DE ALUGUEL (RF14 -> RF18) ────────────────────────────────────
-
-    private fun showPopupConfirmacaoAluguel() {
-        if (tituloAtual.isEmpty()) {
-            Toast.makeText(this, getString(R.string.msg_aguarde_carregamento), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val uid = authRepository.getUsuarioAtual()?.uid ?: return
-
-        // 1. Verifica duplicata antes de mostrar o popup
-        db.collection("solicitacoes_emprestimo")
-            .whereEqualTo("uidAluno", uid)
-            .whereEqualTo("idLivro", livroIdAtual)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val jaAlugado = snapshot.documents.any { doc ->
-                    val status = doc.getString("status") ?: ""
-                    status in listOf("pendente", "ativo", "atrasado")
-                }
-
-                if (jaAlugado) {
-                    Toast.makeText(this, getString(R.string.msg_livro_ja_alugado), Toast.LENGTH_LONG).show()
-                    verificarStatusAluguelRapido() // Atualiza o botão principal
-                } else {
-                    // 2. Mostra o popup de confirmação
-                    val dialog = Dialog(this)
-                    dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-                    dialog.setContentView(R.layout.popup_alugar_livro)
-                    dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
-                    val textTitulo = dialog.findViewById<TextView>(R.id.textTituloPopupAlugar)
-                    textTitulo?.text = "Você deseja alugar o livro\n\"$tituloAtual\"?"
-
-                    dialog.findViewById<Button>(R.id.buttonAdicionarLivro)?.setOnClickListener {
-                        dialog.dismiss()
-                        executarAluguel(uid)
-                    }
-
-                    dialog.findViewById<TextView>(R.id.textCancelarPopup)?.setOnClickListener {
-                        dialog.dismiss()
-                    }
-
-                    dialog.show()
-                }
-            }
-    }
-
-    private fun executarAluguel(uid: String) {
-        lifecycleScope.launch {
-            val resultado = solicitacaoRepository.criarEmprestimoComControleDeEstoque(
-                uidAluno = uid,
-                livroId  = livroIdAtual,
-                titulo   = tituloAtual,
-                autor    = autorAtual
-            )
-
-            resultado.onSuccess {
-                // Registrar no histórico
-                usuarioRepository.registrarNoHistorico(
-                    uid = uid,
-                    livroId = livroIdAtual,
-                    titulo = tituloAtual,
-                    autor = autorAtual,
-                    acao = "Aluguel Solicitado",
-                    coverUrl = coverUrlAtual
-                )
-                showPopupSucessoAluguel()
-                verificarStatusAluguelRapido()
-            }.onFailure { e ->
-                Toast.makeText(this@TelaRF14LeituraActivity, e.message ?: "Erro ao alugar.", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    private fun showPopupSucessoAluguel() {
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(R.layout.popup_livro_adicionado)
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        dialog.setCancelable(false)
-
-        dialog.findViewById<Button>(R.id.buttonVerMeusLivros)?.setOnClickListener {
-            dialog.dismiss()
-            startActivity(Intent(this, TelaRF18StatusAluguel::class.java))
-        }
-
-        dialog.show()
-    }
-
-    // ─── ABRIR MÍDIA (PDF ou AUDIOBOOK) ──────────────────────────────────────
-
-    /**
-     * Abre a URL de mídia com um chooser nativo.
-     * Se o link estiver vazio/nulo, exibe mensagem orientando o usuário a aguardar o bibliotecário.
-     */
-    private fun abrirMidia(url: String, tipo: String) {
-        if (url.isNullOrBlank()) {
-            val msg = if (tipo == "pdf") getString(R.string.msg_pdf_indisponivel) else getString(R.string.msg_audiobook_indisponivel)
-            Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-            return
-        }
-
+    private fun abrirUrlExterna(url: String) {
+        if (url.isBlank()) return
         try {
-            val uri = Uri.parse(url)
-            val mime = if (tipo == "pdf") "application/pdf" else "audio/*"
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, mime)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-
-            val titulo = if (tipo == "pdf") "Abrir PDF com..." else "Ouvir Audiobook com..."
-            val chooser = Intent.createChooser(intent, titulo)
-            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            
-            if (intent.resolveActivity(packageManager) != null || url.startsWith("http")) {
-                startActivity(chooser)
-            } else {
-                // Se falhar o chooser por falta de app específico, tenta abrir via browser
-                val browserIntent = Intent(Intent.ACTION_VIEW, uri)
-                browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                startActivity(browserIntent)
-            }
+            startActivity(
+                Intent.createChooser(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    },
+                    null
+                )
+            )
         } catch (e: Exception) {
-            // Último recurso: tentar abrir a URL pura
-            try {
-                val lastChanceIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                lastChanceIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                startActivity(lastChanceIntent)
-            } catch (e2: Exception) {
-                Toast.makeText(this, "Não foi possível abrir este tipo de arquivo.", Toast.LENGTH_SHORT).show()
-            }
+            Toast.makeText(this, getString(R.string.erro_abrir_link), Toast.LENGTH_SHORT).show()
         }
     }
+
+    // ─── POPUP SETOR LOCALIZADO ───────────────────────────────────────────────
 
     private fun showPopupSetor() {
         val dialog = Dialog(this)
@@ -329,11 +255,12 @@ class TelaRF14LeituraActivity : AppCompatActivity() {
         dialog.setContentView(R.layout.popup_setor_localizado)
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
-        // Define o nome do livro e setor dinamicamente
-        dialog.findViewById<TextView>(R.id.textLivroSetor)?.text = "Livro: $tituloAtual"
-        dialog.findViewById<TextView>(R.id.textSetorLocalizado)?.text = setorAtual
+        dialog.findViewById<TextView>(R.id.textLivroSetor)?.text =
+            "Livro: $tituloAtual"
+        dialog.findViewById<TextView>(R.id.textSetorLocalizado)?.text =
+            setorAtual.ifBlank { getString(R.string.msg_setor_nao_informado) }
 
-        dialog.findViewById<Button>(R.id.buttonVoltarSetor).setOnClickListener { dialog.dismiss() }
+        dialog.findViewById<Button>(R.id.buttonVoltarSetor)?.setOnClickListener { dialog.dismiss() }
         dialog.show()
     }
 }

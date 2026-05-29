@@ -185,7 +185,6 @@
                 android:id="@+id/buttonAbrirPdfLivro"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
-                android:layout_marginBottom="16dp"
                 android:text="Abrir PDF"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
@@ -195,12 +194,21 @@
                 app:cornerRadius="28dp"
                 app:elevation="4dp" />
 
+            <TextView
+                android:id="@+id/textStatusPdf"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="16dp"
+                android:gravity="center"
+                android:textSize="12sp"
+                android:text="" />
+
             <!-- BOTÃO -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonAbrirAudioLivro"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
-                android:layout_marginBottom="16dp"
                 android:text="Abrir Audiobook"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
@@ -209,6 +217,16 @@
                 app:backgroundTint="@color/biblio_blue"
                 app:cornerRadius="28dp"
                 app:elevation="4dp" />
+
+            <TextView
+                android:id="@+id/textStatusAudio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="16dp"
+                android:gravity="center"
+                android:textSize="12sp"
+                android:text="" />
 
             <!-- BOTÃO -->
             <com.google.android.material.button.MaterialButton

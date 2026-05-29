@@ -356,6 +356,41 @@
                         app:tint="@color/black" />
                 </LinearLayout>
 
+                <!-- ── ASIN ── -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="20dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="@string/label_asin"
+                        android:textColor="@color/black"
+                        android:textSize="16sp" />
+                    <EditText
+                        android:id="@+id/editASIN"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:enabled="false"
+                        android:text=""
+                        android:textColor="#777777"
+                        android:textSize="16sp"
+                        android:contentDescription="ASIN do livro" />
+                    <ImageView
+                        android:id="@+id/btnEditASIN"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:alpha="0.6"
+                        android:src="@drawable/ic_edit_pencil"
+                        android:contentDescription="Editar ASIN"
+                        app:tint="@color/black" />
+                </LinearLayout>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -600,10 +635,11 @@
                         android:textSize="18sp" />
 
                     <TextView
+                        android:id="@+id/textExemplaresFormato"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="sans-serif-black"
-                        android:text="10/30"
+                        android:text="—/—"
                         android:textColor="@color/biblio_blue"
                         android:textSize="18sp" />
 
@@ -668,6 +704,22 @@
                 </LinearLayout>
 
             </LinearLayout>
+
+            <!-- ── BOTÃO SALVAR MODIFICAÇÕES ── -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSalvarModificacoes"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="24dp"
+                android:text="@string/btn_salvar_modificacoes"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:backgroundTint="@color/biblio_blue"
+                app:cornerRadius="16dp"
+                app:elevation="4dp" />
 
             <View
                 android:layout_width="match_parent"

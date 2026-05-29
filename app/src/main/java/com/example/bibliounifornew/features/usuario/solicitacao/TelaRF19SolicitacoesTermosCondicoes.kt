@@ -135,8 +135,6 @@ class TelaRF19SolicitacoesTermosCondicoes : AppCompatActivity() {
                     if (isFinishing || isDestroyed) return@withContext
 
                     if (tipoMidia == "Aluguel") {
-                        // O fluxo de Aluguel agora é tratado localmente na TelaRF14LeituraActivity via popup_alugar_livro.
-                        // Caso chegue aqui por algum motivo legado, mantemos o suporte.
                         val resultado = solicitacaoRepository.criarEmprestimoComControleDeEstoque(
                             uidAluno = uid,
                             livroId  = livroId,
@@ -146,6 +144,31 @@ class TelaRF19SolicitacoesTermosCondicoes : AppCompatActivity() {
 
                         resultado.onSuccess {
                             usuarioRepository.registrarNoHistorico(uid, livroId, tituloLivro, autorLivro, "Aluguel Solicitado")
+
+                            // ── 1. Salva referência do livro na subcoleção do usuário ──────────
+                            // Caminho: usuarios/{uid}/livros_alugados/{livroId}
+                            db.collection("usuarios").document(uid)
+                                .collection("livros_alugados")
+                                .document(livroId)
+                                .set(hashMapOf(
+                                    "livroId"     to livroId,
+                                    "titulo"      to tituloLivro,
+                                    "autor"       to autorLivro,
+                                    "dataAluguel" to System.currentTimeMillis()
+                                ))
+
+                            // ── 2. Notificação interna ao usuário ─────────────────────────────
+                            // Caminho: usuarios/{uid}/notificacoes (lida pelo RF20 Notificações)
+                            db.collection("usuarios").document(uid)
+                                .collection("notificacoes")
+                                .add(hashMapOf(
+                                    "titulo"   to "Aluguel solicitado!",
+                                    "mensagem" to "\"$tituloLivro\" foi adicionado aos seus aluguéis.",
+                                    "livroId"  to livroId,
+                                    "lida"     to false,
+                                    "data"     to System.currentTimeMillis()
+                                ))
+
                             showPopupSucesso(livroId, true)
                         }.onFailure { e ->
                             btnConfirmar?.isEnabled = true

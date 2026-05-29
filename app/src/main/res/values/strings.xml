@@ -368,6 +368,10 @@
     <string name="desc_filtro_lista">Filtrar lista</string>
     <string name="desc_capa_livro_crud">Capa do livro</string>
     <string name="btn_editar_informacoes">Editar Informações</string>
+    <string name="btn_salvar_modificacoes">Salvar Modificações</string>
+    <string name="msg_modificacoes_salvas">Modificações salvas com sucesso!</string>
+    <string name="fmt_exemplares_ratio">%1$d/%2$d disponíveis</string>
+    <string name="label_asin">ASIN: </string>
     <string name="desc_foto_adm_header">Foto do Administrador</string>
 
     <!-- RF31 — Cadastro passos 2 e 3 -->
@@ -509,6 +513,8 @@
     <string name="msg_limite_renovacoes">Você já atingiu o limite de renovações desse livro.</string>
     <string name="msg_pdf_indisponivel">Este livro não possui PDF disponível.</string>
     <string name="msg_audiobook_indisponivel">Este livro não possui Audiobook disponível.</string>
+    <string name="msg_midia_disponivel">Disponível para acesso imediato</string>
+    <string name="msg_midia_indisponivel_servidor">Material indisponível no servidor</string>
     <string name="msg_livro_ja_alugado">Este livro já está alugado.</string>
     <string name="msg_solicitacao_duplicada">Você já possui uma solicitação ativa para este livro.</string>
     <string name="msg_edicao_manual_habilitada">Edição manual habilitada</string>

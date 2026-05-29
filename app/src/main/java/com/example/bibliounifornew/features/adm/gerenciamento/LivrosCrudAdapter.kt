@@ -12,12 +12,13 @@ import com.google.android.material.button.MaterialButton
 
 // ─── Modelo de dado ───────────────────────────────────────────────────────────
 data class ItemLivroAdm(
-    val docId      : String = "",
-    val titulo     : String = "Título Indisponível",
-    val autor      : String = "Autor Desconhecido",
-    val isbn       : String = "",
-    val quantidade : Long   = 0L,
-    val coverUrl   : String = ""
+    val docId               : String = "",
+    val titulo              : String = "Título Indisponível",
+    val autor               : String = "Autor Desconhecido",
+    val isbn                : String = "",
+    val quantidadeDisponivel: Long   = 0L,  // cópias disponíveis em tempo real
+    val totalExemplares     : Long   = 0L,  // total físico da faculdade
+    val coverUrl            : String = ""
 )
 
 // ─── Adapter ─────────────────────────────────────────────────────────────────
@@ -27,12 +28,12 @@ class LivrosCrudAdapter(
 ) : RecyclerView.Adapter<LivrosCrudAdapter.ViewHolder>() {
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val imgCapa      : ImageView     = itemView.findViewById(R.id.imgCapaLivroCrud)
-        val txtTitulo    : TextView      = itemView.findViewById(R.id.txtTituloLivroCrud)
-        val txtAutor     : TextView      = itemView.findViewById(R.id.txtAutorLivroCrud)
-        val txtIsbn      : TextView      = itemView.findViewById(R.id.txtIsbnLivroCrud)
-        val txtQtd       : TextView      = itemView.findViewById(R.id.txtQuantidadeLivroCrud)
-        val btnEditar    : MaterialButton = itemView.findViewById(R.id.btnEditarLivroCrud)
+        val imgCapa  : ImageView      = itemView.findViewById(R.id.imgCapaLivroCrud)
+        val txtTitulo: TextView       = itemView.findViewById(R.id.txtTituloLivroCrud)
+        val txtAutor : TextView       = itemView.findViewById(R.id.txtAutorLivroCrud)
+        val txtIsbn  : TextView       = itemView.findViewById(R.id.txtIsbnLivroCrud)
+        val txtQtd   : TextView       = itemView.findViewById(R.id.txtQuantidadeLivroCrud)
+        val btnEditar: MaterialButton = itemView.findViewById(R.id.btnEditarLivroCrud)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -43,23 +44,30 @@ class LivrosCrudAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = lista[position]
+        val ctx  = holder.itemView.context
 
         holder.txtTitulo.text = item.titulo
         holder.txtAutor.text  = item.autor
-        val ctx = holder.itemView.context
+
         holder.txtIsbn.text = if (item.isbn.isNotEmpty())
             ctx.getString(R.string.fmt_isbn, item.isbn)
-            else ctx.getString(R.string.fmt_isbn_vazio)
-        holder.txtQtd.text = if (item.quantidade > 0)
-            ctx.getString(R.string.fmt_exemplares, item.quantidade)
-            else ctx.getString(R.string.fmt_exemplares_vazio)
+        else
+            ctx.getString(R.string.fmt_isbn_vazio)
 
-        // Capa via Coil — desabilitado hardware bitmaps para evitar crash de software rendering
+        // Exibe "disp/total disponíveis" seguindo a regra de negócio unificada
+        val disp  = item.quantidadeDisponivel
+        val total = item.totalExemplares
+        holder.txtQtd.text = when {
+            total > 0 -> ctx.getString(R.string.fmt_exemplares_ratio, disp.toInt(), total.toInt())
+            else      -> ctx.getString(R.string.fmt_exemplares_vazio)
+        }
+
+        // Fallback neutro (ic_sem_capa) — evita exibir capa de outro livro
         holder.imgCapa.load(item.coverUrl.ifEmpty { null }) {
             allowHardware(false)
-            placeholder(R.drawable.user_placeholder)
-            error(R.drawable.user_placeholder)
-            fallback(R.drawable.user_placeholder)
+            placeholder(R.drawable.ic_sem_capa)
+            error(R.drawable.ic_sem_capa)
+            fallback(R.drawable.ic_sem_capa)
         }
 
         holder.btnEditar.setOnClickListener { onEditar(item) }
@@ -67,7 +75,6 @@ class LivrosCrudAdapter(
 
     override fun getItemCount(): Int = lista.size
 
-    /** Substitui toda a lista e atualiza o RecyclerView. */
     fun atualizarLista(novaLista: List<ItemLivroAdm>) {
         lista.clear()
         lista.addAll(novaLista)

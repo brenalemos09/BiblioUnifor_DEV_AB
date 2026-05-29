@@ -10,7 +10,9 @@
       "Bash(Get-Content \"D:\\\\UNIFOR\\\\CienciaComputacao\\\\2026.01_Semestre03\\\\T197-12_DesenvPlatMoveis\\\\BiblioUniforGrupo4\\\\BiblioUnifor_DEV_AB\\\\app\\\\src\\\\main\\\\res\\\\values\\\\strings.xml\")",
       "Bash(Measure-Object -Line)",
       "Bash(git add *)",
-      "Bash(git commit -m 'feat\\(adm\\): RF30/RF31/RF35 — Gestão de Mídias e Acervo CRUD *)"
+      "Bash(git commit -m 'feat\\(adm\\): RF30/RF31/RF35 — Gestão de Mídias e Acervo CRUD *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\UNIFOR\\\\CienciaComputacao\\\\2026.01_Semestre03\\\\T197-12_DesenvPlatMoveis\\\\BiblioUniforGrupo4\\\\BiblioUnifor_DEV_AB\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }

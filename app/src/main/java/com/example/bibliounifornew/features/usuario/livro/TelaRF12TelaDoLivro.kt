@@ -106,6 +106,14 @@ class TelaRF12TelaDoLivro : AppCompatActivity() {
                 }
 
                 // ── Monta objeto local com os campos do Firestore ──────────────
+                val disponivel = (snapshot.getLong("quantidade")
+                    ?: snapshot.getLong("estoque")
+                    ?: snapshot.getLong("stock")
+                    ?: 0L).toInt()
+                val totalFisico = (snapshot.getLong("totalExemplares")
+                    ?: snapshot.getLong("stockQuantity")
+                    ?: disponivel.toLong()).toInt()
+
                 val entidadeRemota = EntidadeLivro(
                     id            = id,
                     title         = snapshot.getString("title")       ?: snapshot.getString("titulo")    ?: "",
@@ -113,10 +121,8 @@ class TelaRF12TelaDoLivro : AppCompatActivity() {
                     description   = snapshot.getString("description") ?: snapshot.getString("descricao") ?: "",
                     coverUrl      = snapshot.getString("coverUrl")    ?: "",
                     category      = snapshot.getString("category")    ?: snapshot.getString("categoria") ?: "",
-                    stockQuantity = (snapshot.getLong("estoque") ?: snapshot.getLong("quantidade")
-                        ?: snapshot.getLong("stock") ?: 0L).toInt(),
-                    isAvailable   = (snapshot.getLong("estoque") ?: snapshot.getLong("quantidade")
-                        ?: snapshot.getLong("stock") ?: 0L) > 0,
+                    stockQuantity = totalFisico,
+                    isAvailable   = disponivel > 0,
                     linkPdf       = snapshot.getString("linkPdf")       ?: "",
                     linkAudiobook = snapshot.getString("linkAudiobook") ?: "",
                     hasBraille    = snapshot.get("hasBraille") as? Boolean ?: false,
@@ -171,11 +177,11 @@ class TelaRF12TelaDoLivro : AppCompatActivity() {
         val imgCapa = findViewById<ImageView>(R.id.imageLivroDetalhes)
         if (livro.coverUrl.isNotEmpty()) {
             imgCapa?.load(livro.coverUrl) {
-                placeholder(R.drawable.osda)
-                error(R.drawable.osda)
+                placeholder(R.drawable.ic_sem_capa)
+                error(R.drawable.ic_sem_capa)
             }
         } else {
-            imgCapa?.setImageResource(R.drawable.osda)
+            imgCapa?.setImageResource(R.drawable.ic_sem_capa)
         }
 
         if (livro.category.isNotEmpty()) {
@@ -197,7 +203,9 @@ class TelaRF12TelaDoLivro : AppCompatActivity() {
         if (livro.isAvailable) {
             txtDisp?.text = "Disponível para aluguel"
             txtDisp?.setTextColor(Color.parseColor("#2E7D32"))
-            txtEstoque?.text = "${livro.stockQuantity} unidade${if (livro.stockQuantity == 1) "" else "s"} em estoque"
+            // Exibe "disponíveis/total" conforme regra de negócio unificada
+            val disponivel = livro.stockQuantity  // disponíveis (campo "quantidade" do Firestore)
+            txtEstoque?.text = "$disponivel unidade${if (disponivel == 1) "" else "s"} disponíveis"
             indicador?.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#4CAF50"))
         } else {
             txtDisp?.text = "Indisponível no momento"
