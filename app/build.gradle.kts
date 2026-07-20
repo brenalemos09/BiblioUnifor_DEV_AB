@@ -40,6 +40,22 @@ android {
         buildConfig = true
     }
 
+    // Assinatura de release lida de local.properties — nunca commitada.
+    // Sem essas chaves configuradas, o build de release cai de volta para
+    // a assinatura debug (útil em CI/checkout limpo, mas não deve ser usado
+    // para publicar o APK oficial).
+    val releaseStoreFile = localProperties.getProperty("RELEASE_STORE_FILE")
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile)
+                storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD")
+                keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS")
+                keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -47,6 +63,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = if (releaseStoreFile != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {
