@@ -66,15 +66,13 @@ O app possui **dois perfis de acesso distintos**: o aluno, que pesquisa, solicit
 
 | Boas-vindas | Dashboard Aluno | Detalhe do Livro |
 |:-----------:|:---------------:|:----------------:|
-| `[screenshot]` | `[screenshot]` | `[screenshot]` |
+| <img src="docs/screenshots/boas-vindas.png" width="200"/> | <img src="docs/screenshots/dashboard-aluno.png" width="200"/> | <img src="docs/screenshots/detalhe-livro.png" width="200"/> |
 
 | Pesquisa | Solicitação | Dashboard ADM |
 |:--------:|:-----------:|:-------------:|
-| `[screenshot]` | `[screenshot]` | `[screenshot]` |
+| <img src="docs/screenshots/pesquisa.png" width="200"/> | <img src="docs/screenshots/solicitacao.png" width="200"/> | <img src="docs/screenshots/dashboard-adm.png" width="200"/> |
 
 </div>
-
-> **Nota para a banca:** substitua os campos `[screenshot]` pelos prints das telas do app. Recomenda-se salvar as imagens em `docs/screenshots/` e referenciar com `<img src="docs/screenshots/nome.png" width="200"/>`.
 
 ---
 

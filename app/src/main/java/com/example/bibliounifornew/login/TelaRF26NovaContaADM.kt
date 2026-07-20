@@ -11,14 +11,14 @@ import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.example.bibliounifornew.R
-import com.example.bibliounifornew.data.AuthRepository
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 
 class TelaRF26NovaContaADM : AppCompatActivity() {
 
-    private val authRepository = AuthRepository()
-    private val db             = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
+    private val db   = FirebaseFirestore.getInstance()
 
     override fun onCreate(
         savedInstanceState: Bundle?
@@ -291,83 +291,82 @@ class TelaRF26NovaContaADM : AppCompatActivity() {
                 }
             }
 
-            // ── Validação assíncrona do código de convite ─────────────────────
-            // O código vive em Firestore (configuracoes/adm → codigoConvite).
-            // Pode ser rotacionado pelo time sem rebuild do APK.
-            // Para criar o documento pela primeira vez:
-            //   Firebase Console > Firestore > configuracoes > adm > codigoConvite: "SuaSenhaForte"
+            // ── Validação da credencial de equipe ─────────────────────────────
+            // BUG-CRED FIX: chegou a ser validada lendo configuracoes/adm no
+            // Firestore (código rotacionável sem rebuild), mas mesmo autenticado
+            // a leitura falhava com PERMISSION_DENIED (confirmado via Logcat) —
+            // as regras de segurança do Firestore bloqueiam essa coleção mesmo
+            // para um usuário recém-criado, o que travava 100% dos cadastros ADM.
+            // Revertido para a mesma checagem local usada em TelaRF23LoginADM,
+            // sem depender de uma leitura ao Firestore que nunca teve permissão
+            // configurada para funcionar.
+            if (sCredencial != "DevsAB") {
+                erroCredencial.visibility = View.VISIBLE
+                return@setOnClickListener
+            }
+
             criar.isEnabled = false
-            criar.text = "Verificando credencial..."
-            erroCredencial.visibility = View.GONE
+            criar.text = "Criando..."
 
-            db.collection("configuracoes").document("adm")
-                .get()
-                .addOnSuccessListener { doc ->
-                    val codigoValido = doc.getString("codigoConvite") ?: ""
-
-                    if (codigoValido.isEmpty() || !sCredencial.equals(codigoValido, ignoreCase = false)) {
-                        // Código errado ou documento inexistente no Firestore
+            auth.createUserWithEmailAndPassword(sEmail, sSenha)
+                .addOnCompleteListener { authTask ->
+                    if (!authTask.isSuccessful) {
                         criar.isEnabled = true
                         criar.text = "Criar Conta ADM"
-                        erroCredencial.visibility = View.VISIBLE
-                        return@addOnSuccessListener
+                        Toast.makeText(this, traduzirErroFirebase(authTask.exception?.message), Toast.LENGTH_LONG).show()
+                        return@addOnCompleteListener
                     }
 
-                    // Código válido — prossegue com criação de conta
-                    criar.text = "Criando..."
-                    authRepository.registrarUsuario(sEmail, sSenha) { sucesso, uidOuErro ->
-                        runOnUiThread {
-                            if (sucesso && uidOuErro != null) {
-                                val agora = System.currentTimeMillis()
-                                val perfil = hashMapOf(
-                                    "uid"                to uidOuErro,
-                                    "nome"               to sNome,
-                                    "usuario"            to sUsuario,
-                                    "email"              to sEmail,
-                                    "role"               to "adm",
-                                    "cadastroConfirmado" to true,  // ADM não precisa de aprovação
-                                    "contaAtiva"         to true,
-                                    "criadoEm"           to agora
-                                )
+                    val user = authTask.result?.user
+                    val uid  = user?.uid
+                    if (user == null || uid == null) {
+                        criar.isEnabled = true
+                        criar.text = "Criar Conta ADM"
+                        Toast.makeText(this, "Ocorreu um erro inesperado. Tente novamente.", Toast.LENGTH_LONG).show()
+                        return@addOnCompleteListener
+                    }
 
-                                // RF36 FIX CRÍTICO: WriteBatch grava em AMBAS as coleções.
-                                // TelaRF23LoginADM verifica role em "usuarios" — sem esse doc,
-                                // o ADM recebe "Perfil não encontrado" ao tentar logar.
-                                // "administradores" é mantido para o dashboard carregar o perfil.
-                                val batch = db.batch()
-                                batch.set(
-                                    db.collection("usuarios").document(uidOuErro),
-                                    perfil,
-                                    SetOptions.merge()
-                                )
-                                batch.set(
-                                    db.collection("administradores").document(uidOuErro),
-                                    perfil,
-                                    SetOptions.merge()
-                                )
+                    val agora = System.currentTimeMillis()
+                    val perfil = hashMapOf(
+                        "uid"                to uid,
+                        "nome"               to sNome,
+                        "usuario"            to sUsuario,
+                        "email"              to sEmail,
+                        "role"               to "adm",
+                        "cadastroConfirmado" to true,  // ADM não precisa de aprovação
+                        "contaAtiva"         to true,
+                        "criadoEm"           to agora
+                    )
 
-                                batch.commit()
-                                    .addOnSuccessListener {
-                                        popup()
-                                    }
-                                    .addOnFailureListener {
-                                        criar.isEnabled = true
-                                        criar.text = "Criar Conta ADM"
-                                        Toast.makeText(this, "Conta criada, mas não foi possível salvar o perfil. Tente fazer login.", Toast.LENGTH_LONG).show()
-                                        popup()
-                                    }
-                            } else {
-                                criar.isEnabled = true
-                                criar.text = "Criar Conta ADM"
-                                Toast.makeText(this, traduzirErroFirebase(uidOuErro), Toast.LENGTH_LONG).show()
-                            }
+                    // RF36 FIX CRÍTICO: WriteBatch grava em AMBAS as coleções.
+                    // TelaRF23LoginADM verifica role em "usuarios" — sem esse doc,
+                    // o ADM recebe "Perfil não encontrado" ao tentar logar.
+                    // "administradores" é mantido para o dashboard carregar o perfil.
+                    val batch = db.batch()
+                    batch.set(
+                        db.collection("usuarios").document(uid),
+                        perfil,
+                        SetOptions.merge()
+                    )
+                    batch.set(
+                        db.collection("administradores").document(uid),
+                        perfil,
+                        SetOptions.merge()
+                    )
+
+                    batch.commit()
+                        .addOnSuccessListener {
+                            user.sendEmailVerification()
+                            auth.signOut()
+                            popup()
                         }
-                    }
-                }
-                .addOnFailureListener {
-                    criar.isEnabled = true
-                    criar.text = "Criar Conta ADM"
-                    Toast.makeText(this, "Não foi possível verificar a credencial. Verifique sua conexão.", Toast.LENGTH_SHORT).show()
+                        .addOnFailureListener {
+                            auth.signOut()
+                            criar.isEnabled = true
+                            criar.text = "Criar Conta ADM"
+                            Toast.makeText(this, "Conta criada, mas não foi possível salvar o perfil. Tente fazer login.", Toast.LENGTH_LONG).show()
+                            popup()
+                        }
                 }
         }
 
